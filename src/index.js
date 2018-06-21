@@ -26,7 +26,7 @@ let localizer = (function () {
         cacheDefault: false,        // cacheDefault: cache (overwrite the previous one) default language in the localstorage
         changingClass: "changing",  // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded
         priority: 'language',       // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if it's not successful request 'pt-BR'. If the priority is the 'country', it will do the inverse.
-        country: true               // country: (consider pt-BR) if it's false, localizer will request 'pt', if it's not successful, it will request the default language.
+        country: true               // country: should localizer request country?
     }
 
     const storage = window.localStorage;
@@ -38,13 +38,7 @@ let localizer = (function () {
         if(!this.config.endpoint.endsWith("/"))
             this.config.endpoint = "/";
 
-        const locale = getBrowserLocale();
-        console.log(locale);
         this.fetcher = jsonClient(this.config.endpoint);
-
-        this._callEvent('initialstart');
-        this._localize(this.config.default);
-        this._callEvent('initialend');
     }
     
     localizer.prototype._callEvent = function(eventName, data){
@@ -61,15 +55,28 @@ let localizer = (function () {
         });
     }
 
-    localizer.prototype._get = async function(lang){
-        return await this._fetcher('get', `${this.config.endpoint}${lang}${this.config.ext}`);
+    localizer.prototype._get = async function(resource){
+        return await this._fetcher('get', `${this.config.endpoint}${resource}${this.config.ext}`);
     }
 
-    localizer.prototype._fetch = async function(lang){
+    localizer.prototype._cacheDefault = async function(){
+        if(storage.getItem("default_lc_name") != this.config.default){
+            storage.setItem("default_json", await this._get(this.config.default));
+            storage.setItem("default_lc_name", this.config.default);
+        }
+    }
+
+    localizer.prototype.init = function(){
+        this._callEvent('initialstart');
+        this._localize();
+        this._callEvent('initialend');
+    }
+
+    localizer.prototype._fetch = function(lang){
         return new Promise((resolve, reject)=>{
             try{
                 if(this.config.cacheLast){
-                    if(storage.getItem("lang_name") == lang){
+                    if(storage.getItem("lc_name") == lang){
                         let data = storage.getItem("lang_json");
                         if(data)
                             resolve(JSON.parse(data));
@@ -77,7 +84,7 @@ let localizer = (function () {
                         this._get(lang).then((data)=>{
                             resolve(data);
                             storage.setItem("lang_json", JSON.stringify(data));
-                            storage.setItem("lang_name", lang);
+                            storage.setItem("lc_name", lang);
                         });
                     }
                     return;
@@ -102,16 +109,51 @@ let localizer = (function () {
                 translation = translation[e];
             });
 
-            if(typeof translation !== "string"){
-                console.warn(`[data-localize=${tick}] translation is not a string`)
+            if(typeof translation !== "string" && typeof translation !== "number"){
+                console.warn(`[data-localize=${tick}] translation is not a string or number`)
             }
             e.textContent = translation;
         });
     }
 
-    localizer.prototype._localize = async function(){
-        let data = await this._fetch(this.currentLang);
-        populate(data);
+    localizer.prototype._fetchFirst = async function(resources){
+        let data = null;
+        for(let i = 0; i < resources.length; i++){
+            try{
+                data = await this._fetch(rsc);
+                break;
+            }catch(e){continue;}
+        }
+        if(null)
+            throw new Error("An error occurred when trying to fetch the data");
+        return data;
+    }
+
+    localizer.prototype._localize = async function(resource){
+        let data;
+        if(!this.config.forceDefault){
+            const locale = getBrowserLocale();
+            let resources = [];
+            switch(this.config.priority){
+                case "country":
+                    if(locale[1])
+                        resources.push(locale[1]);
+                    resources.push(locale[0]);
+                break;
+
+                case "language":
+                default:
+                    resources.push(locale[0]);
+                    if(this.config.country && locale[1])
+                        resources.push(locale[1]);
+                break;
+            }
+            resources.push(this.config.default);
+            data = await this._fetchFirst(resources);
+        }else{
+            data = await this._fetch(this.config.default);
+        }
+        this._populate(data);
     }
 
     localizer.prototype.on = function(event, callback){

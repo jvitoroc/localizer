@@ -5040,7 +5040,10 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 var jsonClient = require("json-client");
 var browserLocale = require("browser-locale");
 
-var localeExpr = /([a-z]+)-?([a-z]+)?/i;
+// ISO 639-1
+// ISO 3166-1
+
+var localeExpr = /(\w+)-?(\w+)?/i;
 
 function getBrowserLocale() {
     var result = browserLocale();
@@ -5056,10 +5059,12 @@ var localizer = function () {
         endpoint: "/translations/", // endpoint: where to fetch the JSONs
         ext: ".json", // ext: extension of the resources
         default: "en", // default: default language
-        forceDefault: false, // forceDefault: always fetch the default language, otherwise fetch accordindly to the user's language
+        forceDefault: false, // forceDefault: if it's true always fetch the default language, otherwise fetch accordindly to the user's language
         cacheLast: true, // cacheLast: cache (overwrite the previous one) the current language's JSON in the localstoage
         cacheDefault: false, // cacheDefault: cache (overwrite the previous one) default language in the localstorage
-        changingClass: "changing" // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded
+        changingClass: "changing", // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded
+        priority: 'language', // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if it's not successful request 'pt-BR'. If the priority is the 'country', it will do the inverse.
+        country: true // country: (consider pt-BR) if it's false, localizer will request 'pt', if it's not successful, it will request the default language.
     };
 
     var storage = window.localStorage;
@@ -5176,8 +5181,8 @@ var localizer = function () {
                 translation = translation[e];
             });
 
-            if (typeof translation !== "string") {
-                console.warn("[data-localize=" + tick + "] translation is not a string");
+            if (typeof translation !== "string" && typeof translation !== "number") {
+                console.warn("[data-localize=" + tick + "] translation is not a string or number");
             }
             e.textContent = translation;
         });
@@ -5195,7 +5200,7 @@ var localizer = function () {
                     case 2:
                         data = _context3.sent;
 
-                        populate(data);
+                        this._populate(data);
 
                     case 4:
                     case "end":
