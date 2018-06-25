@@ -23,7 +23,8 @@ let localizer = (function () {
         default: "en",              // default: default language
         changingClass: "changing",  // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded
         priority: 'language',       // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if it's not successful request 'pt-BR'. If the priority is the 'country', it will do the inverse.
-        country: true               // country: should localizer request country (pt-BR)?
+        country: true,              // country: should localizer request country (pt-BR)?
+        defaultHardcoded: false     // defaultHardcoded: if it's true, the hardcoded strings are the default, don't donwload the default JSON.
     }
 
     const storage = window.localStorage;
@@ -84,20 +85,19 @@ let localizer = (function () {
         let data = null;
         for(let i = 0; i < resources.length; i++){
             try{
-                data = await this._fetch(rsc);
+                data = await this._fetch(resources[i]);
                 break;
             }catch(e){continue;}
         }
         if(data)
-            throw new Error("An error occurred when trying to fetch the data");
+            throw new Error(404);
         return data;
     }
 
     localizer.prototype._localize = async function(){
-        let data;
         let resources = [];
-        let chacedLang = storage.getItem("localizer_lang");
-        if(!chacedLang){
+        let cachedLang = storage.getItem("localizer_lang");
+        if(!cachedLang){
             const locale = getBrowserLocale();
             switch(this.config.priority){
                 case "country":
@@ -115,10 +115,17 @@ let localizer = (function () {
             }
         }
         else
-            resources.push(chacedLang);
-        resources.push(this.config.default);
-        data = await this._fetchFirst(resources);
-        this._populate(data);
+            resources.push(cachedLang);
+        if(!this.config.defaultHardcoded)
+            resources.push(this.config.default);
+        try{
+            let data = await this._fetchFirst(resources);
+            this._populate(data);
+        }catch(e){
+            if(cachedLang)
+                storage.removeItem("localizer_lang");
+        }
+        
     }
 
     localizer.prototype.on = function(event, callback){
@@ -140,3 +147,4 @@ let localizer = (function () {
 })();
 
 var a = new localizer();
+a.init();
