@@ -15,16 +15,30 @@ function getBrowserLocale(){
     return output;
 }
 
+function dotObject(notation, obj){
+    let levels = notation.split(".");
+    try{
+        levels.forEach((e)=>{
+            obj = obj[e];
+        });
+        return obj;
+    }catch(e){
+        return undefined;
+    }
+}
+
 let localizer = (function () {
 
     const DEFAULT_CONFIG = {
-        endpoint: "/strings/",      // endpoint: where to fetch the JSONs
-        ext: ".json",               // ext: extension of the resources
-        default: "en",              // default: default language
-        changingClass: "changing",  // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded
-        priority: 'language',       // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if it's not successful request 'pt-BR'. If the priority is the 'country', it will do the inverse.
+        scope: document,            // scope: limit the search for localizable elements to only elements inside the scope.
+        endpoint: "/strings/",      // endpoint: where to fetch the resources (translations).
+        ext: ".json",               // ext: extension of the resources.
+        local: null,                // local: if an object is provided, localizer won't make external requests to fetch the resources, it will use this object to get the strings (good for small projects).
+        default: "en",              // default: default language.
+        changingClass: "changing",  // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded. If the value is 'null', no class will be added (less overhead).
+        priority: 'language',       // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if the request fails, request 'pt-BR'. If the priority is the 'country', it will do the opposite.
         country: true,              // country: should localizer request country (pt-BR)?
-        defaultHardcoded: false     // defaultHardcoded: if it's true, the hardcoded strings are the default, don't donwload the default JSON.
+        defaultHardcoded: false     // defaultHardcoded: if true, the hardcoded strings (HTML) are the default, localizer won't download the default JSON.
     }
 
     const storage = window.localStorage;
@@ -36,7 +50,7 @@ let localizer = (function () {
         if(!this.config.endpoint.endsWith("/"))
             this.config.endpoint = "/";
 
-        this.fetcher = jsonClient(this.config.endpoint);
+        this._fetcher = jsonClient(this.config.endpoint);
     }
     
     localizer.prototype._callEvent = function(eventName, data){
@@ -65,17 +79,25 @@ let localizer = (function () {
 
     localizer.prototype._populate = function (data){
         let els = document.querySelectorAll('[data-localize]');
-        els.forEach((e)=>{
+        els.forEach(async (e)=>{
             let tick = e.getAttribute("data-localize");
-            let levels = tick.split(".");
-            var translation = data;
-            
-            levels.forEach((e)=>{
-                translation = translation[e];
-            });
+
+            let translation = dotObject(tick, data)
 
             if(typeof translation !== "string" && typeof translation !== "number"){
                 console.warn(`[data-localize=${tick}] translation is not a string or number`)
+            }
+
+            if(translation === undefined || translation === null){
+                if(!this.config.defaultHardcoded){
+                    try{
+                        let defaultData = await this._fetch(this.config.default);
+                        translation = dotObject(tick, defaultData);
+                        if(translation !== undefined && translation !== null){
+                            e.textContent = translation;
+                        }
+                    }catch(e){}
+                }
             }
             e.textContent = translation;
         });
@@ -83,13 +105,20 @@ let localizer = (function () {
 
     localizer.prototype._fetchFirst = async function(resources){
         let data = null;
+        let cachedLangError = false;
         for(let i = 0; i < resources.length; i++){
             try{
                 data = await this._fetch(resources[i]);
                 break;
-            }catch(e){continue;}
+            }catch(e){
+                if(i === 0)
+                    cachedLangError = true;
+                continue;
+            }
         }
-        if(data)
+        if(cachedLangError)
+            storage.removeItem("localizer_lang");
+        if(!data)
             throw new Error(404);
         return data;
     }
@@ -111,19 +140,20 @@ let localizer = (function () {
                     resources.push(locale[0]);
                     if(this.config.country && locale[1])
                         resources.push(locale[1]);
-                break;
             }
         }
         else
             resources.push(cachedLang);
         if(!this.config.defaultHardcoded)
             resources.push(this.config.default);
+
         try{
             let data = await this._fetchFirst(resources);
             this._populate(data);
         }catch(e){
             if(cachedLang)
                 storage.removeItem("localizer_lang");
+            console.log(e);
         }
         
     }

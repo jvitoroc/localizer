@@ -5036,16 +5036,29 @@ function getBrowserLocale() {
     return output;
 }
 
+function dotObject(notation, obj) {
+    var levels = notation.split(".");
+    try {
+        levels.forEach(function (e) {
+            obj = obj[e];
+        });
+        return obj;
+    } catch (e) {
+        return undefined;
+    }
+}
+
 var localizer = function () {
 
     var DEFAULT_CONFIG = {
-        endpoint: "/strings/", // endpoint: where to fetch the JSONs
-        ext: ".json", // ext: extension of the resources
-        default: "en", // default: default language
-        changingClass: "changing", // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded
-        priority: 'language', // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if it's not successful request 'pt-BR'. If the priority is the 'country', it will do the inverse.
+        scope: document, // scope: limit the search for localizable elements to only elements inside the scope.
+        endpoint: "/strings/", // endpoint: where to fetch the resources (JSON).
+        ext: ".json", // ext: extension of the resources.
+        default: "en", // default: default language.
+        changingClass: "changing", // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded. If the value is 'null', no class will be added (less overhead).
+        priority: 'language', // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if the request fails, request 'pt-BR'. If the priority is the 'country', it will do the opposite.
         country: true, // country: should localizer request country (pt-BR)?
-        defaultHardcoded: false // defaultHardcoded: if it's true, the hardcoded strings are the default, don't donwload the default JSON.
+        defaultHardcoded: false // defaultHardcoded: if true, the hardcoded strings are the default, localizer won't download the default JSON.
     };
 
     var storage = window.localStorage;
@@ -5058,7 +5071,7 @@ var localizer = function () {
 
         if (!this.config.endpoint.endsWith("/")) this.config.endpoint = "/";
 
-        this.fetcher = jsonClient(this.config.endpoint);
+        this._fetcher = jsonClient(this.config.endpoint);
     }
 
     localizer.prototype._callEvent = function (eventName, data) {
@@ -5088,14 +5101,13 @@ var localizer = function () {
                 while (1) {
                     switch (_context.prev = _context.next) {
                         case 0:
-                            console.log("" + this.config.endpoint + resource + this.config.ext);
-                            _context.next = 3;
+                            _context.next = 2;
                             return this._fetcher('get', "" + this.config.endpoint + resource + this.config.ext);
 
-                        case 3:
+                        case 2:
                             return _context.abrupt("return", _context.sent);
 
-                        case 4:
+                        case 3:
                         case "end":
                             return _context.stop();
                     }
@@ -5109,145 +5121,194 @@ var localizer = function () {
     }();
 
     localizer.prototype._populate = function (data) {
+        var _this2 = this;
+
         var els = document.querySelectorAll('[data-localize]');
-        els.forEach(function (e) {
-            var tick = e.getAttribute("data-localize");
-            var levels = tick.split(".");
-            var translation = data;
+        els.forEach(function () {
+            var _ref2 = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee2(e) {
+                var tick, translation, defaultData;
+                return _regenerator2.default.wrap(function _callee2$(_context2) {
+                    while (1) {
+                        switch (_context2.prev = _context2.next) {
+                            case 0:
+                                tick = e.getAttribute("data-localize");
+                                translation = dotObject(tick, data);
 
-            levels.forEach(function (e) {
-                translation = translation[e];
-            });
 
-            if (typeof translation !== "string" && typeof translation !== "number") {
-                console.warn("[data-localize=" + tick + "] translation is not a string or number");
-            }
-            e.textContent = translation;
-        });
+                                if (typeof translation !== "string" && typeof translation !== "number") {
+                                    console.warn("[data-localize=" + tick + "] translation is not a string or number");
+                                }
+
+                                if (!(translation === undefined || translation === null)) {
+                                    _context2.next = 15;
+                                    break;
+                                }
+
+                                if (_this2.config.defaultHardcoded) {
+                                    _context2.next = 15;
+                                    break;
+                                }
+
+                                _context2.prev = 5;
+                                _context2.next = 8;
+                                return _this2._fetch(_this2.config.default);
+
+                            case 8:
+                                defaultData = _context2.sent;
+
+                                translation = dotObject(tick, defaultData);
+                                if (translation !== undefined && translation !== null) {
+                                    e.textContent = translation;
+                                }
+                                _context2.next = 15;
+                                break;
+
+                            case 13:
+                                _context2.prev = 13;
+                                _context2.t0 = _context2["catch"](5);
+
+                            case 15:
+                                e.textContent = translation;
+
+                            case 16:
+                            case "end":
+                                return _context2.stop();
+                        }
+                    }
+                }, _callee2, _this2, [[5, 13]]);
+            }));
+
+            return function (_x3) {
+                return _ref2.apply(this, arguments);
+            };
+        }());
     };
 
     localizer.prototype._fetchFirst = function () {
-        var _ref2 = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee2(resources) {
-            var data, i;
-            return _regenerator2.default.wrap(function _callee2$(_context2) {
+        var _ref3 = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee3(resources) {
+            var data, cachedLangError, i;
+            return _regenerator2.default.wrap(function _callee3$(_context3) {
                 while (1) {
-                    switch (_context2.prev = _context2.next) {
+                    switch (_context3.prev = _context3.next) {
                         case 0:
                             data = null;
+                            cachedLangError = false;
                             i = 0;
 
-                        case 2:
+                        case 3:
                             if (!(i < resources.length)) {
-                                _context2.next = 17;
+                                _context3.next = 18;
                                 break;
                             }
 
-                            _context2.prev = 3;
-                            _context2.next = 6;
+                            _context3.prev = 4;
+                            _context3.next = 7;
                             return this._fetch(resources[i]);
 
-                        case 6:
-                            data = _context2.sent;
-
-                            console.log(data);
-                            return _context2.abrupt("break", 17);
+                        case 7:
+                            data = _context3.sent;
+                            return _context3.abrupt("break", 18);
 
                         case 11:
-                            _context2.prev = 11;
-                            _context2.t0 = _context2["catch"](3);
-                            return _context2.abrupt("continue", 14);
+                            _context3.prev = 11;
+                            _context3.t0 = _context3["catch"](4);
 
-                        case 14:
+                            if (i === 0) cachedLangError = true;
+                            return _context3.abrupt("continue", 15);
+
+                        case 15:
                             i++;
-                            _context2.next = 2;
+                            _context3.next = 3;
                             break;
 
-                        case 17:
-                            if (!data) {
-                                _context2.next = 19;
+                        case 18:
+                            if (cachedLangError) storage.removeItem("localizer_lang");
+
+                            if (data) {
+                                _context3.next = 21;
                                 break;
                             }
 
                             throw new Error(404);
 
-                        case 19:
-                            return _context2.abrupt("return", data);
+                        case 21:
+                            return _context3.abrupt("return", data);
 
-                        case 20:
+                        case 22:
                         case "end":
-                            return _context2.stop();
+                            return _context3.stop();
                     }
                 }
-            }, _callee2, this, [[3, 11]]);
+            }, _callee3, this, [[4, 11]]);
         }));
 
-        return function (_x3) {
-            return _ref2.apply(this, arguments);
+        return function (_x4) {
+            return _ref3.apply(this, arguments);
         };
     }();
 
-    localizer.prototype._localize = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee3() {
+    localizer.prototype._localize = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee4() {
         var resources, cachedLang, locale, data;
-        return _regenerator2.default.wrap(function _callee3$(_context3) {
+        return _regenerator2.default.wrap(function _callee4$(_context4) {
             while (1) {
-                switch (_context3.prev = _context3.next) {
+                switch (_context4.prev = _context4.next) {
                     case 0:
                         resources = [];
                         cachedLang = storage.getItem("localizer_lang");
 
                         if (cachedLang) {
-                            _context3.next = 15;
+                            _context4.next = 14;
                             break;
                         }
 
                         locale = getBrowserLocale();
-                        _context3.t0 = this.config.priority;
-                        _context3.next = _context3.t0 === "country" ? 7 : _context3.t0 === "language" ? 10 : 10;
+                        _context4.t0 = this.config.priority;
+                        _context4.next = _context4.t0 === "country" ? 7 : _context4.t0 === "language" ? 10 : 10;
                         break;
 
                     case 7:
                         if (locale[1]) resources.push(locale[1]);
                         resources.push(locale[0]);
-                        return _context3.abrupt("break", 13);
+                        return _context4.abrupt("break", 12);
 
                     case 10:
                         resources.push(locale[0]);
                         if (this.config.country && locale[1]) resources.push(locale[1]);
-                        return _context3.abrupt("break", 13);
 
-                    case 13:
-                        _context3.next = 16;
+                    case 12:
+                        _context4.next = 15;
                         break;
 
-                    case 15:
+                    case 14:
                         resources.push(cachedLang);
 
-                    case 16:
-                        resources.push(this.config.default);
-                        _context3.prev = 17;
-                        _context3.next = 20;
+                    case 15:
+                        if (!this.config.defaultHardcoded) resources.push(this.config.default);
+
+                        _context4.prev = 16;
+                        _context4.next = 19;
                         return this._fetchFirst(resources);
 
-                    case 20:
-                        data = _context3.sent;
+                    case 19:
+                        data = _context4.sent;
 
                         this._populate(data);
-                        _context3.next = 28;
+                        _context4.next = 27;
                         break;
 
-                    case 24:
-                        _context3.prev = 24;
-                        _context3.t1 = _context3["catch"](17);
+                    case 23:
+                        _context4.prev = 23;
+                        _context4.t1 = _context4["catch"](16);
 
-                        console.log(_context3.t1);
                         if (cachedLang) storage.removeItem("localizer_lang");
+                        console.log(_context4.t1);
 
-                    case 28:
+                    case 27:
                     case "end":
-                        return _context3.stop();
+                        return _context4.stop();
                 }
             }
-        }, _callee3, this, [[17, 24]]);
+        }, _callee4, this, [[16, 23]]);
     }));
 
     localizer.prototype.on = function (event, callback) {
