@@ -35,7 +35,7 @@ let localizer = (function () {
         endpoint: "/strings/",      // endpoint: where to fetch the resources (translations).
         ext: ".json",               // ext: extension of the resources.
         default: "en",              // default: default language.
-        changingClass: "changing",  // changingClass: class name what will be added to the <html> element when a resource is being loaded.
+        loadingClass: "loading",    // loadingClass: class name what will be added to the <html> element when a resource is being loaded.
         priority: 'language',       // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if the request fails, request 'pt-BR'. If the priority is the 'country', it will do the opposite.
         country: true,              // country: should localizer request country (pt-BR)?
         defaultHardcoded: false     // defaultHardcoded: if true, the hardcoded strings (HTML) are the default, localizer won't download the default JSON.
@@ -60,6 +60,8 @@ let localizer = (function () {
 
     localizer.prototype.init = function(){
         this._callEvent('initialstart');
+        loadingClass = this.config.loadingClass;
+        this.documentElement.classList.add(loadingClass);
         let search = window.location.search;
         let highPriority = undefined;
 
@@ -71,6 +73,7 @@ let localizer = (function () {
         }
 
         this._localize(highPriority);
+        this.documentElement.classList.remove(loadingClass);
         this._callEvent('initialend');
     }
 
@@ -156,12 +159,12 @@ let localizer = (function () {
     
     localizer.prototype.change = function(lang){
         this._callEvent('changestart', {lang});
-        changingClass = this.config.changingClass;
-        this.documentElement.classList.add(changingClass);
+        loadingClass = this.config.loadingClass;
+        this.documentElement.classList.add(loadingClass);
         
         this._localize();
 
-        this.documentElement.classList.remove(changingClass);
+        this.documentElement.classList.remove(loadingClass);
         this._callEvent('changeend', {lang});
     }
 
