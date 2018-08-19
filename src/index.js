@@ -1,4 +1,5 @@
 const browserLocale = require("browser-locale");
+const jsonClient = require('jsonClient').default;
 
 // ISO 639-1
 // ISO 3166-1
@@ -48,7 +49,7 @@ let localizer = (function () {
 
         if(!this.config.endpoint.endsWith("/"))
             this.config.endpoint = "/";
-        var jsonClient = require('jsonClient');
+        
         this._fetcher = jsonClient(this.config.endpoint);
     }
     
@@ -143,6 +144,7 @@ let localizer = (function () {
         }
         else
             resources.push(cachedLang);
+
         if(!this.config.defaultHardcoded)
             resources.push(this.config.default);
 
@@ -152,7 +154,6 @@ let localizer = (function () {
         }catch(e){
             if(cachedLang)
                 storage.removeItem("localizer_lang");
-            console.log(e);
         }
         
     }

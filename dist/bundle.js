@@ -2260,6 +2260,7 @@ var _assign2 = _interopRequireDefault(_assign);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var browserLocale = require("browser-locale");
+var jsonClient = (typeof window !== "undefined" ? window['jsonClient'] : typeof global !== "undefined" ? global['jsonClient'] : null).default;
 
 // ISO 639-1
 // ISO 3166-1
@@ -2309,7 +2310,7 @@ var localizer = function () {
         this.events = {};
 
         if (!this.config.endpoint.endsWith("/")) this.config.endpoint = "/";
-        var jsonClient = typeof window !== "undefined" ? window['jsonClient'] : typeof global !== "undefined" ? global['jsonClient'] : null;
+
         this._fetcher = jsonClient(this.config.endpoint);
     }
 
