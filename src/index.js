@@ -1,4 +1,3 @@
-const jsonClient = require("json-client");
 const browserLocale = require("browser-locale");
 
 // ISO 639-1
@@ -49,7 +48,7 @@ let localizer = (function () {
 
         if(!this.config.endpoint.endsWith("/"))
             this.config.endpoint = "/";
-
+        var jsonClient = require('jsonClient');
         this._fetcher = jsonClient(this.config.endpoint);
     }
     

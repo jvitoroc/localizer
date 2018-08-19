@@ -2,10 +2,12 @@
   "name": "localizer",
   "version": "1.0.0",
   "description": "",
-  "main": "browserify.js",
+  "main": "bundle.js",
   "dependencies": {
-    "json-client": "^0.9.3",
     "browser-locale": "^1.0.3"
+  },
+  "browserify-shim": {
+    "jsonClient": "global:jsonClient"
   },
   "devDependencies": {
     "minifyify": "^7.3.5",
@@ -19,6 +21,9 @@
     "babel-polyfill": "^6.26.0",
     "babel-preset-stage-0": "^6.24.1",
     "browserify-shim": "^3.8.14"
+  },
+  "peerDependencies": {
+    "json-client": "^0.9.3"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
