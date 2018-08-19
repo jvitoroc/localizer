@@ -2290,18 +2290,16 @@ function dotObject(notation, obj) {
 var localizer = function () {
 
     var DEFAULT_CONFIG = {
+        qs: "lang", // qs: key name of the query string param indicating the language of the page (high priority).
         scope: document, // scope: limit the search for localizable elements to only elements inside the scope.
         endpoint: "/strings/", // endpoint: where to fetch the resources (translations).
         ext: ".json", // ext: extension of the resources.
-        local: null, // local: if an object is provided, localizer won't make external requests to fetch the resources, it will use this object to get the strings (good for small projects).
         default: "en", // default: default language.
-        changingClass: "changing", // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded. If the value is 'null', no class will be added (less overhead).
+        changingClass: "changing", // changingClass: class name what will be added to the <html> element when a resource is being loaded.
         priority: 'language', // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if the request fails, request 'pt-BR'. If the priority is the 'country', it will do the opposite.
         country: true, // country: should localizer request country (pt-BR)?
         defaultHardcoded: false // defaultHardcoded: if true, the hardcoded strings (HTML) are the default, localizer won't download the default JSON.
     };
-
-    var storage = window.localStorage;
 
     function localizer() {
         var config = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -2315,23 +2313,24 @@ var localizer = function () {
     }
 
     localizer.prototype._callEvent = function (eventName, data) {
-        var _this = this;
-
         var events = this.events;
+        console.log(events);
         if (!events.hasOwnProperty(eventName)) return;
-        events[eventName].forEach(function (cb) {
-            if (eventName == "changestart" || eventName == "changeend")
-                // (fromLang, toLang)
-                cb.call(null, _this.config.currentLang, data.lang);
-            if (eventName == "initialstart" || eventName == "initialend")
-                // (lang)
-                cb.call(null, _this.config.currentLang);
-        });
+        events[eventName].call(null, data);
     };
 
     localizer.prototype.init = function () {
         this._callEvent('initialstart');
-        this._localize();
+        var search = window.location.search;
+        var highPriority = undefined;
+
+        if (search !== '') {
+            var parsedQs = new URLSearchParams(search.substring(1));
+            var qs = this.config.qs;
+            if (parsedQs.has(qs)) highPriority = parsedQs.get(qs);
+        }
+
+        this._localize(highPriority);
         this._callEvent('initialend');
     };
 
@@ -2361,7 +2360,7 @@ var localizer = function () {
     }();
 
     localizer.prototype._populate = function (data) {
-        var _this2 = this;
+        var _this = this;
 
         var els = document.querySelectorAll('[data-localize]');
         els.forEach(function () {
@@ -2384,14 +2383,14 @@ var localizer = function () {
                                     break;
                                 }
 
-                                if (_this2.config.defaultHardcoded) {
+                                if (_this.config.defaultHardcoded) {
                                     _context2.next = 15;
                                     break;
                                 }
 
                                 _context2.prev = 5;
                                 _context2.next = 8;
-                                return _this2._fetch(_this2.config.default);
+                                return _this._fetch(_this.config.default);
 
                             case 8:
                                 defaultData = _context2.sent;
@@ -2415,7 +2414,7 @@ var localizer = function () {
                                 return _context2.stop();
                         }
                     }
-                }, _callee2, _this2, [[5, 13]]);
+                }, _callee2, _this, [[5, 13]]);
             }));
 
             return function (_x3) {
@@ -2426,60 +2425,55 @@ var localizer = function () {
 
     localizer.prototype._fetchFirst = function () {
         var _ref3 = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee3(resources) {
-            var data, cachedLangError, i;
+            var data, i;
             return _regenerator2.default.wrap(function _callee3$(_context3) {
                 while (1) {
                     switch (_context3.prev = _context3.next) {
                         case 0:
                             data = null;
-                            cachedLangError = false;
                             i = 0;
 
-                        case 3:
+                        case 2:
                             if (!(i < resources.length)) {
-                                _context3.next = 18;
+                                _context3.next = 16;
                                 break;
                             }
 
-                            _context3.prev = 4;
-                            _context3.next = 7;
+                            _context3.prev = 3;
+                            _context3.next = 6;
                             return this._fetch(resources[i]);
 
-                        case 7:
+                        case 6:
                             data = _context3.sent;
-                            return _context3.abrupt("break", 18);
+                            return _context3.abrupt("break", 16);
 
-                        case 11:
-                            _context3.prev = 11;
-                            _context3.t0 = _context3["catch"](4);
+                        case 10:
+                            _context3.prev = 10;
+                            _context3.t0 = _context3["catch"](3);
+                            return _context3.abrupt("continue", 13);
 
-                            if (i === 0) cachedLangError = true;
-                            return _context3.abrupt("continue", 15);
-
-                        case 15:
+                        case 13:
                             i++;
-                            _context3.next = 3;
+                            _context3.next = 2;
                             break;
 
-                        case 18:
-                            if (cachedLangError) storage.removeItem("localizer_lang");
-
-                            if (data) {
-                                _context3.next = 21;
+                        case 16:
+                            if (!(data === null)) {
+                                _context3.next = 18;
                                 break;
                             }
 
                             throw new Error(404);
 
-                        case 21:
+                        case 18:
                             return _context3.abrupt("return", data);
 
-                        case 22:
+                        case 19:
                         case "end":
                             return _context3.stop();
                     }
                 }
-            }, _callee3, this, [[4, 11]]);
+            }, _callee3, this, [[3, 10]]);
         }));
 
         return function (_x4) {
@@ -2488,80 +2482,70 @@ var localizer = function () {
     }();
 
     localizer.prototype._localize = (0, _asyncToGenerator3.default)( /*#__PURE__*/_regenerator2.default.mark(function _callee4() {
-        var resources, cachedLang, locale, data;
+        var highPriority = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : undefined;
+        var resources, locale, data;
         return _regenerator2.default.wrap(function _callee4$(_context4) {
             while (1) {
                 switch (_context4.prev = _context4.next) {
                     case 0:
                         resources = [];
-                        cachedLang = storage.getItem("localizer_lang");
-
-                        if (cachedLang) {
-                            _context4.next = 14;
-                            break;
-                        }
-
                         locale = getBrowserLocale();
+
+                        if (highPriority !== undefined) resources.push(highPriority);
                         _context4.t0 = this.config.priority;
-                        _context4.next = _context4.t0 === "country" ? 7 : _context4.t0 === "language" ? 10 : 10;
+                        _context4.next = _context4.t0 === "country" ? 6 : _context4.t0 === "language" ? 9 : 9;
                         break;
 
-                    case 7:
+                    case 6:
                         if (locale[1]) resources.push(locale[1]);
                         resources.push(locale[0]);
-                        return _context4.abrupt("break", 12);
+                        return _context4.abrupt("break", 11);
 
-                    case 10:
+                    case 9:
                         resources.push(locale[0]);
                         if (this.config.country && locale[1]) resources.push(locale[1]);
 
-                    case 12:
-                        _context4.next = 15;
-                        break;
+                    case 11:
 
-                    case 14:
-                        resources.push(cachedLang);
-
-                    case 15:
                         if (!this.config.defaultHardcoded) resources.push(this.config.default);
 
-                        _context4.prev = 16;
-                        _context4.next = 19;
+                        _context4.prev = 12;
+                        _context4.next = 15;
                         return this._fetchFirst(resources);
 
-                    case 19:
+                    case 15:
                         data = _context4.sent;
 
                         this._populate(data);
-                        _context4.next = 27;
+                        _context4.next = 22;
                         break;
 
-                    case 23:
-                        _context4.prev = 23;
-                        _context4.t1 = _context4["catch"](16);
+                    case 19:
+                        _context4.prev = 19;
+                        _context4.t1 = _context4["catch"](12);
 
-                        if (cachedLang) storage.removeItem("localizer_lang");
-                        console.log(_context4.t1);
+                        console.error(_context4.t1);
 
-                    case 27:
+                    case 22:
                     case "end":
                         return _context4.stop();
                 }
             }
-        }, _callee4, this, [[16, 23]]);
+        }, _callee4, this, [[12, 19]]);
     }));
 
     localizer.prototype.on = function (event, callback) {
-        if (!events[event].hasOwnProperty(event)) events[event] = [];
-        events[event].push(callback);
+        this.events[event] = callback;
     };
 
     localizer.prototype.change = function (lang) {
         this._callEvent('changestart', { lang: lang });
-        storage.setItem("localizer_lang", lang);
+        changingClass = this.config.changingClass;
+        this.documentElement.classList.add(changingClass);
 
         this._localize();
 
+        this.documentElement.classList.remove(changingClass);
         this._callEvent('changeend', { lang: lang });
     };
 
@@ -2569,6 +2553,9 @@ var localizer = function () {
 }();
 
 var a = new localizer();
+a.on("initialstart", function (data) {
+    console.log('213');
+});
 a.init();
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"babel-runtime/core-js/object/assign":1,"babel-runtime/helpers/asyncToGenerator":3,"babel-runtime/regenerator":4,"browser-locale":5}]},{},[83]);

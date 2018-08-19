@@ -30,18 +30,16 @@ function dotObject(notation, obj){
 let localizer = (function () {
 
     const DEFAULT_CONFIG = {
+        qs: "lang",                 // qs: key name of the query string param indicating the language of the page (high priority).
         scope: document,            // scope: limit the search for localizable elements to only elements inside the scope.
         endpoint: "/strings/",      // endpoint: where to fetch the resources (translations).
         ext: ".json",               // ext: extension of the resources.
-        local: null,                // local: if an object is provided, localizer won't make external requests to fetch the resources, it will use this object to get the strings (good for small projects).
         default: "en",              // default: default language.
-        changingClass: "changing",  // changingClass: class name that will be added to the elements with the [data-localize] attribute when a translation is being loaded. If the value is 'null', no class will be added (less overhead).
+        changingClass: "changing",  // changingClass: class name what will be added to the <html> element when a resource is being loaded.
         priority: 'language',       // priority(language|country): (consider pt-BR) if the priority is the 'language', then localizer will request 'pt' first, if the request fails, request 'pt-BR'. If the priority is the 'country', it will do the opposite.
         country: true,              // country: should localizer request country (pt-BR)?
         defaultHardcoded: false     // defaultHardcoded: if true, the hardcoded strings (HTML) are the default, localizer won't download the default JSON.
     }
-
-    const storage = window.localStorage;
 
     function localizer(config = {}){
         this.config = Object.assign(DEFAULT_CONFIG, config);
@@ -57,19 +55,22 @@ let localizer = (function () {
         let events = this.events;
         if(!events.hasOwnProperty(eventName))
             return;
-        events[eventName].forEach((cb)=>{
-            if(eventName == "changestart" || eventName == "changeend")
-                // (fromLang, toLang)
-                cb.call(null, this.config.currentLang, data.lang);
-            if(eventName == "initialstart" || eventName == "initialend")
-                // (lang)
-                cb.call(null, this.config.currentLang);
-        });
+        events[eventName].call(null, data)
     }
 
     localizer.prototype.init = function(){
         this._callEvent('initialstart');
-        this._localize();
+        let search = window.location.search;
+        let highPriority = undefined;
+
+        if(search !== ''){
+            let parsedQs = new URLSearchParams(search.substring(1));
+            let qs = this.config.qs;
+            if(parsedQs.has(qs))
+                highPriority = parsedQs.get(qs);
+        }
+
+        this._localize(highPriority);
         this._callEvent('initialend');
     }
 
@@ -105,45 +106,37 @@ let localizer = (function () {
 
     localizer.prototype._fetchFirst = async function(resources){
         let data = null;
-        let cachedLangError = false;
         for(let i = 0; i < resources.length; i++){
             try{
                 data = await this._fetch(resources[i]);
                 break;
             }catch(e){
-                if(i === 0)
-                    cachedLangError = true;
                 continue;
             }
         }
-        if(cachedLangError)
-            storage.removeItem("localizer_lang");
-        if(!data)
+        if(data === null)
             throw new Error(404);
         return data;
     }
 
-    localizer.prototype._localize = async function(){
+    localizer.prototype._localize = async function(highPriority = undefined){
         let resources = [];
-        let cachedLang = storage.getItem("localizer_lang");
-        if(!cachedLang){
-            const locale = getBrowserLocale();
-            switch(this.config.priority){
-                case "country":
-                    if(locale[1])
-                        resources.push(locale[1]);
-                    resources.push(locale[0]);
-                break;
+        const locale = getBrowserLocale();
+        if(highPriority !== undefined)
+            resources.push(highPriority);
+        switch(this.config.priority){
+            case "country":
+                if(locale[1])
+                    resources.push(locale[1]);
+                resources.push(locale[0]);
+            break;
 
-                case "language":
-                default:
-                    resources.push(locale[0]);
-                    if(this.config.country && locale[1])
-                        resources.push(locale[1]);
-            }
+            case "language":
+            default:
+                resources.push(locale[0]);
+                if(this.config.country && locale[1])
+                    resources.push(locale[1]);
         }
-        else
-            resources.push(cachedLang);
 
         if(!this.config.defaultHardcoded)
             resources.push(this.config.default);
@@ -152,24 +145,23 @@ let localizer = (function () {
             let data = await this._fetchFirst(resources);
             this._populate(data);
         }catch(e){
-            if(cachedLang)
-                storage.removeItem("localizer_lang");
+            console.error(e);
         }
         
     }
 
     localizer.prototype.on = function(event, callback){
-        if(!events[event].hasOwnProperty(event))
-            events[event] = [];
-        events[event].push(callback);
+        this.events[event] = callback;
     }
     
     localizer.prototype.change = function(lang){
         this._callEvent('changestart', {lang});
-        storage.setItem("localizer_lang", lang);
+        changingClass = this.config.changingClass;
+        this.documentElement.classList.add(changingClass);
         
         this._localize();
 
+        this.documentElement.classList.remove(changingClass);
         this._callEvent('changeend', {lang});
     }
 
